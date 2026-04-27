@@ -31,6 +31,7 @@ rag-paper-app/
 │   └── src/
 │       └── App.jsx    # React UI
 └── README.md
+
 ## ⚙️ Setup Instructions
 
 ### Prerequisites
