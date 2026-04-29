@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import fitz
+from docx import Document as DocxDocument
 
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
@@ -38,11 +39,31 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     # Extract text
     pdf_bytes = await file.read()
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    filename = file.filename.lower()
     text = ""
-    for page in doc:
-        text += page.get_text()
 
+    #PDF
+    if filename.endswith(".pdf"):
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        for page in doc:
+            text += page.get_text()
+
+    #DOCX
+    elif filename.endswith(".docx"):
+        doc = DocxDocument(io.BytesIO(pdf_bytes))
+        for para in doc.paragraphs:
+            text += para.text + "\n"
+        
+    #txt
+    elif filename.endswith(".txt"):
+        text = pdf_bytes.decode("utf-8")
+    
+    else:
+        return {"error": "Unsupported file type. Please upload a PDF, DOCX, or TXT file."}
+
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Could not extract any text from the uploaded file.")
+    
     # Chunk text
     splitter = CharacterTextSplitter(
         separator="\n",
@@ -59,7 +80,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     )
     knowledge_base = FAISS.from_texts(chunks, embeddings)
 
-    return {"message": "PDF indexed successfully", "chunks": len(chunks)}
+    return {"message": "File indexed successfully", "chunks": len(chunks)}
 
 # ── POST /ask ─────────────────────────────────────────────────────────────────
 @app.post("/ask")
